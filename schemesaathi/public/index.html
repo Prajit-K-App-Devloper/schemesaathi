@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SchemeSaathi – Understand any government scheme in your language</title>
+<meta name="description" content="Paste a government notice or scheme. Get a simple explanation, eligibility check and next steps in your language, with voice.">
+<style>
+:root{--bg:#f6f8f4;--card:#fff;--ink:#16241b;--mut:#55655a;--brand:#0f6b4f;--accent:#e8a317;--line:#d9e2d9;--bad:#b3261e}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1713;--card:#17231c;--ink:#e8f1ea;--mut:#9bb0a2;--brand:#4cc29a;--accent:#f0b73a;--line:#2a3a31;--bad:#ff8a80}}
+*{box-sizing:border-box}body{margin:0;font:16px/1.6 system-ui,"Noto Sans","Noto Sans Devanagari","Noto Sans Telugu","Noto Sans Tamil",sans-serif;background:var(--bg);color:var(--ink)}
+header{padding:28px 16px 8px;max-width:860px;margin:auto}
+h1{margin:0;font-size:2rem;letter-spacing:-.02em}h1 span{color:var(--brand)}
+header p{margin:.3rem 0 0;color:var(--mut)}
+main{max-width:860px;margin:auto;padding:12px 16px 60px;display:grid;gap:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px}
+label{display:block;font-weight:600;font-size:.9rem;margin-bottom:4px}
+textarea,input,select{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}
+textarea{min-height:170px;resize:vertical}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:12px}
+.btns{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+button{border:0;border-radius:8px;padding:11px 18px;font:inherit;font-weight:600;cursor:pointer;background:var(--brand);color:#fff}
+button.alt{background:transparent;color:var(--brand);border:1.5px solid var(--brand)}
+button:disabled{opacity:.6;cursor:wait}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.badge{display:inline-block;padding:4px 12px;border-radius:99px;font-weight:700;font-size:.9rem}
+.likely_eligible{background:#d7f3e6;color:#0b5a3c}.likely_not_eligible{background:#fde0de;color:#8a1c14}.need_more_info{background:#fff0c7;color:#7a5600}
+h2{margin:0 0 6px;font-size:1.15rem}h3{margin:16px 0 4px;font-size:1rem;color:var(--brand)}
+ul{margin:4px 0 0;padding-left:20px}
+.err{color:var(--bad);font-weight:600}.hide{display:none}.small{font-size:.85rem;color:var(--mut)}
+</style>
+</head>
+<body>
+<header>
+  <h1>Scheme<span>Saathi</span></h1>
+  <p>Paste a government notice or scheme. Get it explained simply, in your language.</p>
+</header>
+<main>
+  <section class="card">
+    <label for="text">Notice or scheme text</label>
+    <textarea id="text" placeholder="Paste the notice, scheme details or law here, or speak using the mic."></textarea>
+    <div class="btns">
+      <button class="alt" id="mic" type="button">🎤 Speak</button>
+      <button class="alt" id="sample" type="button">Try a sample</button>
+    </div>
+    <div class="row">
+      <div><label for="lang">Explain in</label>
+        <select id="lang"></select></div>
+      <div><label for="age">Age</label><input id="age" type="number" min="0" max="120"></div>
+      <div><label for="income">Yearly family income (₹)</label><input id="income" type="number" min="0"></div>
+      <div><label for="state">State</label><input id="state" placeholder="e.g. Telangana"></div>
+      <div><label for="occ">Occupation</label><input id="occ" placeholder="e.g. farmer, student"></div>
+      <div><label for="cat">Category</label>
+        <select id="cat"><option value="">Prefer not to say</option><option>General</option><option>OBC</option><option>SC</option><option>ST</option><option>EWS</option></select></div>
+    </div>
+    <div class="btns"><button id="go" type="button">Explain and check eligibility</button></div>
+    <p id="msg" class="small" role="status" aria-live="polite"></p>
+  </section>
+  <section id="out" class="card hide" aria-live="polite"></section>
+</main>
+<script>
+const LANGS = {English:'en-IN',Hindi:'hi-IN',Telugu:'te-IN',Tamil:'ta-IN',Kannada:'kn-IN',Malayalam:'ml-IN',Bengali:'bn-IN',Marathi:'mr-IN',Gujarati:'gu-IN',Punjabi:'pa-IN'};
+const $ = id => document.getElementById(id);
+$('lang').innerHTML = Object.keys(LANGS).map(l => `<option>${l}</option>`).join('');
+const VERDICT = {likely_eligible:'Likely eligible',likely_not_eligible:'Likely not eligible',need_more_info:'Need more information'};
+const SAMPLE = `PM Kisan Samman Nidhi: Small and marginal farmer families owning cultivable land receive Rs 6,000 per year in three equal instalments of Rs 2,000, paid directly to the bank account. Not eligible: institutional landholders, income tax payers, serving or retired government employees (except Multi Tasking Staff), professionals such as doctors and engineers, and former or present constitutional post holders. Farmers must complete e-KYC and link Aadhaar with their bank account. Apply through the PM Kisan portal or Common Service Centre with land records, Aadhaar and bank passbook.`;
+$('sample').onclick = () => { $('text').value = SAMPLE; };
+
+// Voice input
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (!SR) $('mic').style.display = 'none';
+else $('mic').onclick = () => {
+  const r = new SR(); r.lang = LANGS[$('lang').value]; r.interimResults = false;
+  $('msg').textContent = 'Listening...';
+  r.onresult = e => { $('text').value += (($('text').value ? ' ' : '') + e.results[0][0].transcript); $('msg').textContent = ''; };
+  r.onerror = () => { $('msg').textContent = 'Could not hear you. Check microphone permission and try again.'; };
+  r.start();
+};
+
+function el(tag, text, cls){ const e = document.createElement(tag); if(text!==undefined) e.textContent = text; if(cls) e.className = cls; return e; }
+function list(title, items){
+  const f = document.createDocumentFragment();
+  if(!Array.isArray(items) || !items.length) return f;
+  f.append(el('h3', title)); const ul = el('ul');
+  items.forEach(i => ul.append(el('li', i))); f.append(ul); return f;
+}
+function speak(text){
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text); u.lang = LANGS[$('lang').value]; speechSynthesis.speak(u);
+}
+
+$('go').onclick = async () => {
+  const btn = $('go'), out = $('out');
+  btn.disabled = true; $('msg').textContent = 'Reading the document...'; $('msg').className = 'small';
+  try {
+    const res = await fetch('/api/explain', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
+      text: $('text').value, language: $('lang').value,
+      profile: {age:$('age').value, yearlyIncomeINR:$('income').value, state:$('state').value, occupation:$('occ').value, category:$('cat').value}
+    })});
+    const d = await res.json();
+    if(!res.ok) throw new Error(d.error || 'Something went wrong.');
+    out.replaceChildren();
+    out.append(el('h2', d.title || 'Result'));
+    const v = d.eligibility?.verdict || 'need_more_info';
+    out.append(el('span', VERDICT[v] || v, 'badge ' + v));
+    out.append(el('p', d.summary));
+    out.append(list('Key points', d.keyPoints), list('Why this result', d.eligibility?.reasons), list('Your rights', d.rights),
+               list('Documents to keep ready', d.documentsNeeded), list('Next steps', d.nextSteps));
+    if(d.warning) out.append(el('p', d.warning, 'small'));
+    const listen = el('button', '🔊 Listen', 'alt'); listen.type='button';
+    listen.onclick = () => speak([d.title, d.summary, ...(d.keyPoints||[]), ...(d.nextSteps||[])].join('. '));
+    out.append(listen);
+    out.classList.remove('hide'); $('msg').textContent = ''; out.scrollIntoView({behavior:'smooth'});
+  } catch(e){ $('msg').textContent = e.message; $('msg').className = 'err'; }
+  btn.disabled = false;
+};
+</script>
+</body>
+</html>
